@@ -4,7 +4,7 @@
 #include <string.h>
 #include<time.h>
 
-#include <Game.h>
+#include "game.h"
 
 Game g;
 int g_debug = 0;
@@ -27,6 +27,7 @@ void game_new(void)
     g.episode = 1;
     g.debt = 41300;
     g.seed = (uint32_t) time(NULL);
+    g.betrayer = -1;
 
 
 }
@@ -174,7 +175,7 @@ static void render_imp1(const char *in, int stage, uint32_t seed, char *out, siz
                 app(out, cap, &n, TOK[rng_next(&r) % (sizeof TOK/sizeof *TOK)]);
             }
             else{
-                for(const char *q = p; q < e; e++)
+                for(const char *q = p; q < e; q++)
                 {
                     char c = *q;
                     if(isalpha((unsigned char)c)) {
@@ -203,7 +204,7 @@ static void render_imp1(const char *in, int stage, uint32_t seed, char *out, siz
         if(isalpha((unsigned char)in[i])){
             size_t j = i;
             while(j < len && isalpha((unsigned char) in[j])) j++;
-            if(j - i > b1) { bs = i; b1 = j - 1;}
+            if(j - i > b1) { bs = i; b1 = j - i;}
             i = j;
 
         }
@@ -232,11 +233,16 @@ static void speaker_tag(CharId who, int stage, char *buf, size_t cap) {
 void say_as(CharId who, const char *text)
 {
     int st = stage_of(g.c[who].humanity);
-    char out[1024], tag[32];
+    char out[1024], tag[32], line[1100];
+    const char *col = (st >= 3) ? COL_GLITCH : ui_char_color(who);   //corrupted speakers turn red
     render_corrupted(text, st, g.seed, out, sizeof out);
     speaker_tag(who, st, tag, sizeof tag);
-    printf("\n%s:  \"%s\"\n", tag, out);
+    snprintf(line, sizeof line, "\"%s\"", out);
 
+    ui_print(col, "\n%s: ", tag);
+    ui_type(line, col, 2, st);
+    ui_print("", "\n");
+    ui_pause(250);
 
 }
 
@@ -255,7 +261,13 @@ void narrate(const char *text) {
 
     uint32_t h = fnv(text) ^ g.seed;
     if(ps>=3 && (h >> 3) % 100 < 45)
-        printf("\n%s\n", out);
+        ui_print(COL_GLITCH, "\n%s\n", INTRUDE[h % (sizeof INTRUDE / sizeof *INTRUDE)]);
+
+    render_imp1(text, ns, g.seed, out, sizeof out, 1);
+    ui_print("", "\n");
+    ui_type(out, COL_NARR, 0, ns);
+    ui_print("", "\n");
+    ui_pause(250);
 
 }
 
@@ -265,34 +277,38 @@ int choose (int n, const Opt *opts) {
     int pickable[16];
     if(n > 16) n = 16;
 
-    printf("\n");
+    ui_print("", "\n");
     for(int i = 0; i < n; i++)
     {
-        char buf[512];
+        char buf[512], full[600];
         const char *shown = opts[i].text;
         const char *suffix = "";
+        const char *col = COL_OPT;
         int ok = opts[i].enabled;
         
         if(opts[i].kind == K_KIND && ps >= 3){
             //empathy is gone you cannot even read the options
             snprintf(buf, sizeof buf, "[ ######## ]");
-            shown = buf; suffix = " (the words won't come)"; ok =0;
+            shown = buf; suffix = " (the words won't come)"; ok =0; col = COL_GLITCH;
 
         }
         else if(opts[i].kind == K_KIND && ps == 2) {
             render_corrupted(opts[i].text, 2, g.seed, buf, sizeof buf);
             shown = buf;
         }
-        if(!opts[i].enabled && !suffix[0] ) suffix = " (unavailable)";
+        if(!opts[i].enabled && !suffix[0] ) { suffix = " (unavailable)"; col = COL_LOCK; }
 
-        printf("[%d] %s%s\n", i+1, shown, suffix);
+        snprintf(full, sizeof full, "%s%s", shown, suffix);
+        ui_print(COL_NUM, "  [%d] ", i+1);
+        ui_wrap(full, col, 6);
+        ui_print("", "\n");
         pickable[i] = ok;
 
     }
 
     for(;;){
         char buf[64];
-        printf("> ");
+        ui_print(COL_NUM, "> ");
         if(!fgets(buf, sizeof buf, stdin)) exit(0);
         if(buf[0] == 's') { save_game(); continue;}
         if(buf[0] == 'l') {if(load_game()) return -1; continue;}
@@ -300,7 +316,7 @@ int choose (int n, const Opt *opts) {
         int k = atoi(buf);
         if(k >= 1 && k <= n && pickable [k -1 ]) return k-1;
         
-        puts(" Pick a valid option.");
+        ui_print(COL_NOTE, " Pick a valid option.\n");
 
     }
 
@@ -313,7 +329,7 @@ void react(CharId who, int delta ) {
     c -> trust += delta;
     if(c->trust > 5) c -> trust = 5;
     if(c->trust < -5) c -> trust = -5;
-    printf("\n >> %s will remember that.\n", char_name(who));
+    ui_print(COL_NOTE, "\n >> %s will remember that.\n", char_name(who));
 
 }
 
@@ -328,9 +344,9 @@ static void stage_notice (CharId who, int stage) {
         "Nothing feels like yours anymore."
     };
     if((int)who == g.protagonist)
-        printf("\n ~ %s\n", M[stage]);
+        ui_print(COL_GLITCH, "\n ~ %s\n", M[stage]);
     else
-        printf("\n ~ %s's words come out %s. \n", char_name(who), 
+        ui_print(COL_GLITCH, "\n ~ %s's words come out %s. \n", char_name(who), 
                 stage <= 1 ? "a little wrong" : stage == 2 ? "broken" : "like commands");
 
 }
@@ -340,9 +356,14 @@ static void stage_notice (CharId who, int stage) {
 int install_chrome(CharId t, ChromeTier tier, ChromeSource src, Consent cons) {
     Char *c = &g.c[t];
 
+    if(src == SRC_FIXER && g.c[PICO].state != ST_ACTIVE) {
+        ui_print(COL_NOTE, "\n There is no fixer left to do this.\n");
+        return 0;
+    }
+
     if(src == SRC_MEDIC){
         Char *m  = &g.c[OKAFOR];
-        if(m->state != ST_ACTIVE) {puts("\n There is no Medic to do this."); return 0;}
+        if(m->state != ST_ACTIVE) {ui_print(COL_NOTE, "\n There is no Medic to do this.\n"); return 0;}
         if(m->trust < 1) {
             say_as(OKAFOR, "I don't put steel in people I dont trust");
             return 0;
@@ -355,10 +376,10 @@ int install_chrome(CharId t, ChromeTier tier, ChromeSource src, Consent cons) {
 
     }
     if(cons == CONSENT_ASKED && c->trust < 0) {
-        printf("\n %s refuses.\n", char_name(t));
+        ui_print(COL_NOTE, "\n %s refuses.\n", char_name(t));
         return 0;
     }
-    static const int base[3] = {6, 12, 20};
+    static const int base[3] = {8, 16, 26};
     static const int pct[3] = {60, 100, 140};
     int cost = base[tier] * pct[src]/100;
 
@@ -376,7 +397,7 @@ int install_chrome(CharId t, ChromeTier tier, ChromeSource src, Consent cons) {
     if(c-> humanity <= 0) {
         c -> humanity = 0;
         c -> state = ST_PSYCHO;
-        printf("\n ~ %s breaks.\n", char_name(t));
+        ui_print(COL_WARN, "\n ~ %s breaks.\n", char_name(t));
         return 1;
 
     }
@@ -395,7 +416,7 @@ void handoff_if_needed (void) {
     for(int i = 0; i < CREW_COUNT; i++)
     {
         if(i == g.protagonist || g.c[i].state != ST_ACTIVE) continue;
-        if(best < 0 || g.c[i].trust > g.c[best].trust) best = 1;
+        if(best < 0 || g.c[i].trust > g.c[best].trust) best = i;
 
     }
 
@@ -406,54 +427,53 @@ void handoff_if_needed (void) {
         g.scene = S_END_NOBODY;
         return;
     }
-    printf("\n=== CONTROL SHIFTS ===\n");
-    printf("\n  %s is gone. You are %s now.\n", char_name(g.protagonist), char_name(best));
+    ui_pause(600);
+    ui_print(COL_WARN, "\n=== CONTROL SHIFTS ===\n");
+    ui_print(COL_WARN, "\n  %s is gone. You are %s now.\n", char_name(g.protagonist), char_name(best));
     g.protagonist = best;
     SET(F_HANDOFF_DONE); 
 }
 
 // Save/Load
 #define SAVE_MAGIC 0x464C5431u   
-#define SAVE_VERSION 1u
+#define SAVE_VERSION 2u
 
 typedef struct {uint32_t magic, version; Game game;} SaveFile;
 
 int save_game(void)
 {
     FILE *f = fopen("save.dat", "wb");
-    if(!f) { puts(" (save Failed)"); return 0;}
+    if(!f) { ui_print(COL_NOTE, " (save Failed)\n"); return 0;}
     SaveFile s= {SAVE_MAGIC, SAVE_VERSION, g};
     fwrite(&s, sizeof s, 1, f);
     fclose(f);
-    puts(" (saved)");
+    ui_print(COL_NOTE, " (saved)\n");
     return 1;
 
 }
 
 int load_game(void) {
     FILE *f = fopen("save.dat", "rb");
-    if(!f) { puts(" (no save foud)"); return 0;}
+    if(!f) { ui_print(COL_NOTE, " (no save foud)\n"); return 0;}
     SaveFile s;
     int ok = fread(&s, sizeof s, 1, f) == 1;
     fclose(f);
     if(!ok || s.magic != SAVE_MAGIC || s.version != SAVE_VERSION) {
-        puts(" (save is corrupt or from another version)");
+        ui_print(COL_NOTE, " (save is corrupt or from another version)\n");
         return 0;
     }
     g = s.game;
-    puts(" (loaded)");
+    ui_print(COL_NOTE, " (loaded)\n");
     return 1;
 }
 
 void debug_dump(void ) {
     static const char *STN[] = {"absent", "active", "dead", "left", "psycho", "lost"};
-    printf("\n [DEBUG] scene = %d protagonist = %s debt = %d flags = 0x%11x \n",
+    printf("\n [DEBUG] scene = %d protagonist = %s debt = %d flags = 0x%llx \n",
             g.scene, char_name(g.protagonist), g.debt, (unsigned long long)g.flags);
     for(int i = 0; i < CREW_COUNT; i++)
         printf("  [DEBUG] %-10s %-6s humanity=%3d (stage %d) trust=%+d implants=%d\n",
                 char_name(i), STN[g.c[i].state], g.c[i].humanity,
-                stage_of(g.c[i].humanity, g.c[i].trust, g.c[i].implants));
+                stage_of(g.c[i].humanity), g.c[i].trust, g.c[i].implants);
     
 }
-
-
