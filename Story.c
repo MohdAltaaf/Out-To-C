@@ -467,7 +467,7 @@ static int scene_e2_map(void)
         {nixtxt, K_NEUTRAL, !HAS(F_VISITED_NIX)},
         {oktxt, K_NEUTRAL, !HAS(F_VISITED_OKAFOR)}
     };
-    int c = ASK(o); CEHCK(o);
+    int c = ASK(o); CHECK(c);
 
     if(c == 0)
     {
