@@ -12,6 +12,7 @@
 #include <io.h>
 #else
 #include <sys/select.h>
+#include <termios.h>
 #include <unistd.h>
 #endif
 
@@ -84,7 +85,7 @@ void ui_init(int fast, int nocolor)
 static int skip_pressed(void)
 {
 #ifdef _WIN32
-    if(_kbhit()) { _getch(); return 1; }
+    if(_kbhit()) { while(_kbhit()) _getch(); return 1; }
     return 0;
 #else
     fd_set fds;
@@ -93,11 +94,22 @@ static int skip_pressed(void)
     FD_SET(STDIN_FILENO, &fds);
     if(select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0)
     {
-        char tmp[64];
-        if(!fgets(tmp, sizeof tmp, stdin)) return 1;
+        tcflush(STDIN_FILENO, TCIFLUSH);
         return 1;
     }
     return 0;
+#endif
+}
+
+//drops anything the player typed while text was still printing, so it can't leak into a menu
+void ui_flush_input(void)
+{
+#ifdef _WIN32
+    HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+    if(h != INVALID_HANDLE_VALUE) FlushConsoleInputBuffer(h);
+    while(_kbhit()) _getch();
+#else
+    if(isatty(STDIN_FILENO)) tcflush(STDIN_FILENO, TCIFLUSH);
 #endif
 }
 
@@ -203,4 +215,5 @@ void ui_print(const char *color, const char *fmt, ...)
 
     for(const char *p = buf; *p; p++)
         ui_col = (*p == '\n') ? 0 : ui_col + 1;
+    fflush(stdout);
 }

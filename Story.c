@@ -3,7 +3,7 @@
 
 #include "game.h"
 
-#define ASK(o) choose((int)(sizeof (0) / sizeof((o)[0])), (o))
+#define ASK(o) choose((int)(sizeof(o) / sizeof((o)[0])), (o))
 #define CHECK(c) do {if((c) < 0) return g.scene;} while (0)
 #define ACTIVE(id) (g.c[id].state == ST_ACTIVE)
 
@@ -60,72 +60,76 @@ static void set_trust(CharId who, int v) {
 
 static int scene_clinic(void) {
     banner("EPISODE 1: FLATLINE");
-
-    narrate("Arroyo, Santo Domingo. Hour twelve of a shift in a clinic with no windows"
-            "and no license. The ceiling drips into a bucket Mario calls \"the budget\". \n\n "
-        "On your bench: a gangoon's cracked optic, half a lens of flickering blue."
-        "In the corner of your vision the Petrochem counter shows the same number"
-        "it showed yesterday. You know it by heart.");
-
+ 
+    narrate("Arroyo, Santo Domingo. Hour twelve of a shift in a clinic with no windows "
+            "and no licence. The ceiling drips into a bucket Marlo calls \"the budget\".\n\n"
+            "On your bench: a gangoon's cracked optic, half a lens of flickering blue. "
+            "In the corner of your vision the Petrochem counter shows the same number "
+            "it showed yesterday. You know it by heart.");
+ 
     show_debt();
-
-    narrate("Dinner is a tube of synth-protien paste, eaten cold, one-handed"
+ 
+    narrate("Dinner is a tube of synth-protein paste, eaten cold, one-handed. "
             "A message from your brother slides across the corner of your vision.");
-
-    say_npc("LEO [msg]", "Found us a place in Westbrook. Two rooms. Real windows"
-            "If I make team lead by spring the sublease is basically ours."
-            "Please eat something that isn't paste", 0);
-
-    narrate("Leo keeps records for an Arasaka subcontractor a few districts up."
-            "The company gave him a badge, a lens and a corporate ladder to climb."
-            "\"Company-issue\" he says of the lens. \"Free\""
+ 
+    say_npc("LEO [msg]", "Found us a place in Westbrook. Two rooms. Real windows. "
+                         "If I make team lead by spring the sublease is basically ours. "
+                         "Please eat something that isn't paste.", 0);
+ 
+    narrate("Leo keeps records for an Arasaka subcontractor a few districts up. "
+            "The company gave him a badge, a ladder, and a lens, and he climbs like a man "
+            "who can see the top. \"Company-issue,\" he says of the lens. \"Free.\" "
             "You have told him more than once that nothing in this city is free.\n\n"
-            "Westbrook. Real Windows. It's the only thing the two of you have ever agreed to want.");
-    
-    narrate("Marlo leans out of the back office. He owns the clinic and every excuse for it, and the runs the place on one rule. ");
-    say_npc("MARLO", "Everybody in Arroyo keeps a ledger. Be careful what you write in someone else's.", 0);
-
-    narrate("Across the waiting room a factory hand named Tasmin sits with her forearm open on a tray, "
+            "Westbrook. Real windows. It's the only thing the two of you have ever agreed to want.");
+ 
+    narrate("Marlo leans out of the back office. He owns the clinic and every excuse for it, "
+            "and he runs the place on one rule.");
+    say_npc("Marlo", "Everybody in Arroyo keeps a ledger. Be careful what you write in someone else's.", 0);
+ 
+    narrate("Across the waiting room a factory hand named Tamsin sits with her forearm open on a tray, "
             "waiting on a recalibration. She has been talking to nobody for ten minutes.");
-    say_npc("TASMIN", "I just need it to grip. I just need it to grip properly so i can go back to work", 1);
-    narrate("Marlo watches you notice. \"Third install,\" he says, quietly."
+    say_npc("Tamsin", "I just need it to grip. I just need it to grip properly so I can go back to work.", 1);
+    narrate("Marlo watches you notice. \"Third install,\" he says, quietly. "
             "\"The arm is fine. The arm is always fine. It's the person the chrome eats.\"");
-
-    narrate("You Recalibrate Tasmin's arm, and she leaves. You have a few minutes to yourself before the next patient. "
-            "You check the Petrochem counter. Seeing the familiar big number makes you lose hope. You have been working for a week and the number has not barely dropped. ");
-
-    narrate("Dex, hand you an eye, leans onto the counter and doesn't look at anything for longer than a second."
-            "\"Just make it work.\" he says. \"It doesn't have to be pretty.\"");
-    Opt o[] = {
-        {"Fix it properly. Costs you an extra hour and the good solder.", K_KIND , 1},
+ 
+    narrate("Dex, the owner of the eye on your bench, leans onto the counter and doesn't look at anything "
+            "for longer than a second. \"Just make it work. It doesn't have to be pretty.\"");
+ 
+    Opt o[] ={
+        {"Fix it properly. It costs you an extra hour and the good solder", K_KIND, 1},
         {"Tell him the parts cost double. He won't check (probably)", K_COLD, 1},
-        {"Fix it and quitely pocket the quality lens and replace it with a cheap one", K_COLD, 1 }
+        {"Fix it and quietly pocket a spare lens from the bin", K_COLD, 1}
     };
     int c = ASK(o); CHECK(c);
-
-    if(c == 0){
+ 
+    if(c == 0)
+    {
         SET(F_FIXED_DEX_RIGHT);
-        narrate("The blue steadies into a clean white. Dex holds the eye up to the light and nods at you."
-                "\"Thanks. It's good as new\"");
+        narrate("The blue steadies into a clean white. Dex holds the eye up to the light and turns his head, "
+                "like a man checking a stranger's face.\n"
+                "\"...Thanks. Most people would've just made it work.\"\n\n"
+                "He taps the counter twice. \"There's a doc under the drain district who'd like you. "
+                "Fixes anyone, asks nothing. Tell her Dex sent you.\"");
         marker("Dex");
-
     }
-    else if(c == 1 ) {
+    else if (c==1)
+    {
         SET(F_CHEATED_DEX);
-        g.debt -=240;
-        narrate("He pays without a word. The number in your debt drop, barely. "
-                "You feel bad about this. \n\n"
-                "On his way out Dex looks at every face in the room, one second each."
-                "The way you'd memorise a room you might have to describe later");
-
+        g.debt -= 240;
+        narrate("He pays without a word. The number in your debt drops, barely. "
+                "You don't feel better.\n\n"
+                "On his way out Dex looks at every face in the room, one second each. "
+                "The way you'd memorise a room you might have to describe later.");
         show_debt();
         marker("Dex");
     }
-    else {
+    else
+    {
         SET(F_HAS_LENS);
-        narrate("The optic works. In your sleeve, a spare lens the size of a coin."
-                "Dex does not notice. Marlo does.");
-        
+        narrate("The optic works. In your sleeve, a spare lens the size of a coin. "
+                "A lens like that can whiteout a sensor for a few seconds. "
+                "It isn't much. Some nights it's enough.\n\n"
+                "Dex never looks at your hands. Marlo does.");
     }
     return S_E1_MERC;
 }

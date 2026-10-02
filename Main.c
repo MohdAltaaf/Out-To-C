@@ -74,5 +74,9 @@
         handoff_if_needed();
         if(g_debug) debug_dump();
     }
+    
+    ui_print(COL_NOTE, "\nPress Enter to exit.\n");
+    getchar();
+
     return 0;
  }

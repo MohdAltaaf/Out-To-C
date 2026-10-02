@@ -169,6 +169,7 @@ void ui_print(const char *color, const char *fmt, ...);
 void ui_type(const char *text, const char *color, int indent, int stage);
 void ui_wrap(const char *text, const char *color, int indent);
 void ui_pause(int ms);
+void ui_flush_input(void);   /* throw away keys typed while text was printing */
 const char *ui_char_color(CharId who);
 
 //colors

@@ -272,11 +272,8 @@ void narrate(const char *text) {
 }
 
 //choices: menu itself is corrupted by protagonist's state
-int choose (int n, const Opt *opts) {
-    int ps = stage_of(g.c[g.protagonist].humanity);
-    int pickable[16];
-    if(n > 16) n = 16;
-
+static void show_menu(int n, const Opt *opts, int ps, int *pickable)
+{
     ui_print("", "\n");
     for(int i = 0; i < n; i++)
     {
@@ -285,12 +282,11 @@ int choose (int n, const Opt *opts) {
         const char *suffix = "";
         const char *col = COL_OPT;
         int ok = opts[i].enabled;
-        
+
         if(opts[i].kind == K_KIND && ps >= 3){
             //empathy is gone you cannot even read the options
             snprintf(buf, sizeof buf, "[ ######## ]");
-            shown = buf; suffix = " (the words won't come)"; ok =0; col = COL_GLITCH;
-
+            shown = buf; suffix = " (the words won't come)"; ok = 0; col = COL_GLITCH;
         }
         else if(opts[i].kind == K_KIND && ps == 2) {
             render_corrupted(opts[i].text, 2, g.seed, buf, sizeof buf);
@@ -303,23 +299,32 @@ int choose (int n, const Opt *opts) {
         ui_wrap(full, col, 6);
         ui_print("", "\n");
         pickable[i] = ok;
-
     }
+}
+
+int choose (int n, const Opt *opts) {
+    int ps = stage_of(g.c[g.protagonist].humanity);
+    int pickable[16];
+    if(n > 16) n = 16;
+
+    show_menu(n, opts, ps, pickable);
+    ui_flush_input();      //anything typed while the text was printing is thrown away
 
     for(;;){
         char buf[64];
         ui_print(COL_NUM, "> ");
+        fflush(stdout);
         if(!fgets(buf, sizeof buf, stdin)) exit(0);
-        if(buf[0] == 's') { save_game(); continue;}
-        if(buf[0] == 'l') {if(load_game()) return -1; continue;}
-        if(buf[0] == 'q') exit(0);
+        char ch = (char)tolower((unsigned char)buf[0]);
+        if(ch == 's') { save_game(); continue;}
+        if(ch == 'l') {if(load_game()) return -1; continue;}
+        if(ch == 'q') exit(0);
         int k = atoi(buf);
-        if(k >= 1 && k <= n && pickable [k -1 ]) return k-1;
-        
-        ui_print(COL_NOTE, " Pick a valid option.\n");
+        if(k >= 1 && k <= n && pickable[k - 1]) return k-1;
 
+        if(ch != '\n' && ch != '\r') ui_print(COL_NOTE, " Pick a valid option.\n");
+        show_menu(n, opts, ps, pickable);     //always show the choices again
     }
-
 }
 
 //Trust 
